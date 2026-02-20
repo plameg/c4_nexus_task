@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Urban Collective</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <style>
+        :root{
+            --primary:#111;
+            --accent:#c8a96a;
+            --bg:#f7f7f7;
+        }
+
+        body{
+            margin:0;
+            font-family:'Segoe UI',sans-serif;
+            background:var(--bg);
+            color:#333;
+        }
+
+        /* HEADER */
+        header{
+            position:sticky;
+            top:0;
+            background:#fff;
+            padding:20px 60px;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            border-bottom:1px solid #eee;
+            z-index:1000;
+        }
+
+        .logo{
+            font-size:20px;
+            letter-spacing:3px;
+            font-weight:600;
+        }
+
+        nav button{
+            background:none;
+            border:none;
+            margin-left:30px;
+            font-size:14px;
+            cursor:pointer;
+            padding-bottom:4px;
+        }
+
+        nav button.active{
+            border-bottom:2px solid var(--primary);
+            font-weight:600;
+        }
+
+        /* LAYOUT */
+        .container{
+            display:flex;
+            gap:40px;
+            padding:40px 60px;
+        }
+
+        .filters{
+            width:260px;
+            background:white;
+            padding:25px;
+            border-radius:8px;
+            box-shadow:0 4px 15px rgba(0,0,0,0.05);
+            height:fit-content;
+        }
+
+        .color-swatch{
+            width:22px;
+            height:22px;
+            border-radius:50%;
+            display:inline-block;
+            margin:6px;
+            cursor:pointer;
+            border:2px solid transparent;
+        }
+
+        .color-swatch.active{
+            border:2px solid black;
+        }
+
+        .products-section{flex:1;}
+
+        .products-section h2{
+            font-size:28px;
+            margin-bottom:5px;
+        }
+
+        .controls{
+            display:flex;
+            justify-content:space-between;
+            margin:20px 0;
+        }
+
+        .product-grid{
+            display:grid;
+            grid-template-columns:repeat(4,1fr);
+            gap:30px;
+        }
+
+        .product-card{
+            background:white;
+            border-radius:8px;
+            padding:15px;
+            box-shadow:0 6px 18px rgba(0,0,0,0.05);
+            transition:0.3s;
+        }
+
+        .product-card:hover{
+            transform:translateY(-6px);
+        }
+
+        .product-card img{
+            width:100%;
+            height:240px;
+            object-fit:cover;
+            border-radius:6px;
+        }
+
+        .price{
+            margin-top:8px;
+            font-weight:600;
+        }
+
+        .old-price{
+            text-decoration:line-through;
+            color:#c0392b;
+            margin-right:6px;
+        }
+
+        .rating{
+            color:#f1c40f;
+            margin:6px 0;
+        }
+
+        button.add-cart{
+            width:100%;
+            padding:10px;
+            border:none;
+            background:var(--primary);
+            color:white;
+            border-radius:4px;
+            cursor:pointer;
+            transition:0.3s;
+        }
+
+        button.add-cart:hover{
+            background:var(--accent);
+            color:black;
+        }
+
+        .load-more{
+            margin:40px auto;
+            display:block;
+            padding:12px 35px;
+            background:var(--primary);
+            color:white;
+            border:none;
+            border-radius:4px;
+            cursor:pointer;
+        }
+
+        footer{
+            margin-top:60px;
+            background:#111;
+            color:white;
+            padding:30px;
+            text-align:center;
+        }
+
+        @media(max-width:1024px){
+            .product-grid{grid-template-columns:repeat(3,1fr);}
+        }
+        @media(max-width:768px){
+            .container{flex-direction:column;}
+            .filters{width:100%;}
+            .product-grid{grid-template-columns:repeat(2,1fr);}
+        }
+        @media(max-width:480px){
+            .product-grid{grid-template-columns:1fr;}
+        }
+    </style>
+</head>
+
+<body>
+<div id="app">
+
+    <header>
+        <div class="logo">URBAN COLLECTIVE</div>
+        <nav>
+            <button v-for="(cat,key) in categories"
+                    :key="key"
+                    :class="{active:currentCategory===key}"
+                    @click="changeCategory(key)">
+                {{cat.title}}
+            </button>
+        </nav>
+    </header>
+
+    <div class="container">
+
+        <!-- FILTER -->
+        <div class="filters">
+            <h3>Filters</h3>
+
+            <h4>Color</h4>
+            <div>
+                <div v-for="color in availableColors"
+                     :key="color"
+                     class="color-swatch"
+                     :style="{background:color}"
+                     :class="{active:selectedColors.includes(color)}"
+                     @click="toggleColor(color)">
+                </div>
+            </div>
+
+            <h4>Max Price</h4>
+            <input type="range" min="80" max="600" v-model="maxPrice">
+            <p>Up to ${{maxPrice}}</p>
+        </div>
+
+        <!-- PRODUCTS -->
+        <div class="products-section">
+
+            <h2>{{currentData.title}}</h2>
+            <p>{{currentData.description}}</p>
+
+            <div class="controls">
+                <div>
+                    {{visibleProducts.length}} out of {{filteredProducts.length}} products displayed
+                </div>
+
+                <select v-model="sortOption">
+                    <option value="">Sort By</option>
+                    <option value="az">Alphabetical (A-Z)</option>
+                    <option value="za">Alphabetical (Z-A)</option>
+                    <option value="low">Price (Low to High)</option>
+                    <option value="high">Price (High to Low)</option>
+                </select>
+            </div>
+
+            <div class="product-grid">
+                <div class="product-card"
+                     v-for="product in visibleProducts"
+                     :key="product.id">
+
+                    <img :src="product.image" :alt="product.name">
+
+                    <h4>{{product.name}}</h4>
+                    <p>{{product.description}}</p>
+
+                    <div class="price">
+          <span v-if="product.discountPrice">
+            <span class="old-price">${{product.price}}</span>
+            ${{product.discountPrice}}
+          </span>
+                        <span v-else>
+            ${{product.price}}
+          </span>
+                    </div>
+
+                    <div class="rating">
+                        {{ "★".repeat(product.rating) + "☆".repeat(5-product.rating) }}
+                    </div>
+
+                    <button class="add-cart" @click="addToCart">
+                        Add to Cart
+                    </button>
+                </div>
+            </div>
+
+            <button v-if="visibleCount < filteredProducts.length"
+                    class="load-more"
+                    @click="loadMore">
+                Load More
+            </button>
+
+        </div>
+    </div>
+
+    <footer>
+        Terms & Conditions | Privacy Policy | Contact Us
+    </footer>
+
+</div>
+
+<script>
+    const { createApp } = Vue;
+
+    createApp({
+        data(){
+            return{
+                PRODUCTS_PER_PAGE:20,
+                visibleCount:20,
+                currentCategory:'bags',
+                selectedColors:[],
+                maxPrice:600,
+                sortOption:'',
+                availableColors:["black","brown","tan","navy","olive","gray","white","beige","burgundy","camel"],
+                categories:{
+                    bags:{
+                        title:"Bags",
+                        description:"Timeless craftsmanship designed for modern living.",
+                        products:[]
+                    },
+                    shoes:{
+                        title:"Shoes",
+                        description:"Built for movement, refined for everyday wear.",
+                        products:[]
+                    }
+                }
+            }
+        },
+
+        computed:{
+            currentData(){return this.categories[this.currentCategory];},
+            filteredProducts(){
+                let products=[...this.currentData.products];
+                products=products.filter(p=>
+                    (this.selectedColors.length===0 || this.selectedColors.includes(p.color)) &&
+                    (p.discountPrice||p.price)<=this.maxPrice
+                );
+                if(this.sortOption==='az') products.sort((a,b)=>a.name.localeCompare(b.name));
+                if(this.sortOption==='za') products.sort((a,b)=>b.name.localeCompare(a.name));
+                if(this.sortOption==='low') products.sort((a,b)=>(a.discountPrice||a.price)-(b.discountPrice||b.price));
+                if(this.sortOption==='high') products.sort((a,b)=>(b.discountPrice||b.price)-(a.discountPrice||a.price));
+                return products;
+            },
+            visibleProducts(){
+                return this.filteredProducts.slice(0,this.visibleCount);
+            }
+        },
+
+        methods:{
+            toggleColor(color){
+                if(this.selectedColors.includes(color)){
+                    this.selectedColors=this.selectedColors.filter(c=>c!==color);
+                } else {
+                    this.selectedColors.push(color);
+                }
+                this.visibleCount=this.PRODUCTS_PER_PAGE;
+            },
+            changeCategory(key){
+                this.currentCategory=key;
+                this.visibleCount=this.PRODUCTS_PER_PAGE;
+                this.selectedColors=[];
+                this.sortOption='';
+            },
+            loadMore(){
+                this.visibleCount+=this.PRODUCTS_PER_PAGE;
+            },
+            addToCart(){
+                alert("Product added to cart");
+            },
+
+            generateProducts(){
+                const bagImages=[
+                    "https://images.unsplash.com/photo-1590874103328-eac38a683ce7",
+                    "https://images.unsplash.com/photo-1581605405669-fcdf81165afa",
+                    "https://images.unsplash.com/photo-1520975916090-3105956dac38",
+                    "https://images.unsplash.com/photo-1548036328-c9fa89d128fa"
+                ];
+
+                const shoeImages=[
+                    "https://images.unsplash.com/photo-1542291026-7eec264c27ff",
+                    "https://images.unsplash.com/photo-1600180758890-6b94519a8ba6",
+                    "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77",
+                    "https://images.unsplash.com/photo-1608256246200-53e635b5b65f"
+                ];
+
+                const bagNames=["Harbor Tote","Nomad Pack","Midnight Sling","Heritage Satchel","Coastal Duffel"];
+                const shoeNames=["Apex Runner","Trail Summit","Metro Knit","Heritage Boot","Velocity Trainer"];
+
+                for(let i=0;i<40;i++){ 
+                    this.categories.bags.products.push({
+                        id:"b"+i,
+                        name:bagNames[i%bagNames.length]+" "+(i+1),
+                        description:"Premium leather craftsmanship with reinforced stitching.",
+                        price:Math.floor(Math.random()*400)+150,
+                        discountPrice:Math.random()>0.6?Math.floor(Math.random()*300)+120:null,
+                        rating:Math.floor(Math.random()*5)+1,
+                        color:this.availableColors[Math.floor(Math.random()*this.availableColors.length)],
+                        image:bagImages[i%bagImages.length]
+                    });
+
+                    this.categories.shoes.products.push({
+                        id:"s"+i,
+                        name:shoeNames[i%shoeNames.length]+" "+(i+1),
+                        description:"Engineered comfort and durable performance outsole.",
+                        price:Math.floor(Math.random()*350)+120,
+                        discountPrice:Math.random()>0.6?Math.floor(Math.random()*280)+100:null,
+                        rating:Math.floor(Math.random()*5)+1,
+                        color:this.availableColors[Math.floor(Math.random()*this.availableColors.length)],
+                        image:shoeImages[i%shoeImages.length]
+                    });
+                }
+            }
+        },
+
+        mounted(){
+            this.generateProducts();
+        }
+
+    }).mount("#app");
+</script>
+
+</body>
+</html>
